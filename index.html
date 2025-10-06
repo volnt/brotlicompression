@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Brotli Compressor / Decompressor</title>
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --panel: #10151c;
+      --panel-2: #0f141b;
+      --text: #e6edf3;
+      --muted: #9fb0c0;
+      --accent: #6aa7ff;
+      --accent-2: #7bd4b2;
+      --ring: #284e91;
+      --danger: #ff6b6b;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius: 16px;
+      --pass: #7bd4b2;
+      --fail: #ff8a8a;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Apple Color Emoji, Segoe UI Emoji;
+      background: radial-gradient(1200px 800px at 10% -10%, #132035 0%, transparent 60%),
+                  radial-gradient(800px 600px at 110% 10%, #0a1628 0%, transparent 55%),
+                  var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    .container { max-width: 1100px; margin: 40px auto; padding: 0 20px; }
+    .header { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
+    .logo {
+      width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+      box-shadow: var(--shadow);
+      font-weight: 800; color:#0a0f15; letter-spacing: .5px;
+    }
+    h1 { font-size: clamp(22px, 3.2vw, 34px); margin: 0; }
+    .sub { color: var(--muted); font-size: 14px; }
+
+    .grid { display: grid; gap: 18px; grid-template-columns: 1fr; }
+    @media (min-width: 980px) { .grid { grid-template-columns: 1fr 1fr; } }
+
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.0)), var(--panel);
+      border: 1px solid rgba(120,144,180,.15);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .card h2 { margin: 0; padding: 16px 18px; font-size: 14px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid rgba(120,144,180,.12); }
+
+    .pad { padding: 16px; }
+
+    .textarea-wrap { position: relative; }
+    textarea {
+      width: 100%; height: 320px; resize: vertical;
+      background: var(--panel-2); color: var(--text);
+      border: 1px solid rgba(120,144,180,.18); border-radius: 12px;
+      padding: 14px 14px 36px 14px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      line-height: 1.45; font-size: 14px;
+      outline: none; box-shadow: inset 0 0 0 1px transparent;
+    }
+    textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(106,167,255,.15); }
+
+    .metrics {
+      position: absolute; right: 10px; bottom: 8px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+      color: var(--muted); font-size: 12px; user-select: none;
+    }
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 999px; border: 1px solid rgba(120,144,180,.25);
+      background: rgba(255,255,255,.03);
+    }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px rgba(106,167,255,.2) inset; }
+    .dot.alt { background: var(--accent-2); box-shadow: 0 0 0 3px rgba(123,212,178,.2) inset; }
+
+    .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .btn {
+      appearance: none; border: 1px solid rgba(120,144,180,.25); background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02)); color: var(--text);
+      padding: 10px 14px; border-radius: 12px; font-weight: 600; letter-spacing: .02em; cursor: pointer; transition: transform .06s ease, box-shadow .2s ease, border-color .2s ease;
+      box-shadow: var(--shadow);
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+    .btn.primary { border-color: transparent; background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%); color: #07111c; }
+    .btn.ghost { background: transparent; }
+    .btn.warn { border-color: rgba(255,107,107,.5); color: #ffd3d3; }
+
+    .pill { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; border: 1px dashed rgba(120,144,180,.35); color: var(--muted); font-size: 12.5px; background: rgba(255,255,255,.02); }
+    code.inline { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 12.5px; color: #d0e1ff; }
+    .note { color: var(--muted); font-size: 13px; }
+    .footer { margin-top: 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+    .support { display: inline-flex; gap: 8px; align-items: center; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(120,144,180,.18); background: rgba(123,212,178,.08); }
+    .chip { padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,.06); border: 1px solid rgba(120,144,180,.25); font-size: 12px; }
+
+    .hidden { display: none; }
+    .tests { font-size: 13px; color: var(--muted); }
+    .test-pass { color: var(--pass); }
+    .test-fail { color: var(--fail); }
+  </style>
+  <!-- Fallback library: httptoolkit/brotli-wasm (browser ESM build) -->
+  <script type="module">
+    // Default export resolves to an object { compress, decompress }
+    window.__brotliPromise = import("https://unpkg.com/brotli-wasm@3.0.1/index.web.js?module").then(m => m.default);
+  </script>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo">BR</div>
+      <div>
+        <h1 style="margin-bottom:6px">Brotli Playground</h1>
+        <div class="sub">Compress & decompress using the browser — single‑file, no build.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Input</h2>
+      <div class="pad">
+        <div class="controls" style="margin-bottom:12px">
+          <button class="btn primary" id="btn-compress">Compress</button>
+          <button class="btn" id="btn-decompress">Decompress</button>
+          <span class="pill">Output format: <code class="inline">base64</code> (Brotli binary)</span>
+        </div>
+        <div class="textarea-wrap">
+          <textarea id="input" placeholder="Paste plain text to compress, or paste base64 to decompress..."></textarea>
+          <div class="metrics" id="input-metrics">
+            <div class="badge" title="UTF‑8 bytes"><span class="dot"></span><span id="input-bytes">0</span> bytes</div>
+            <div class="badge" title="Characters"><span class="dot alt"></span><span id="input-chars">0</span> chars</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Output</h2>
+      <div class="pad">
+        <div class="controls" style="margin-bottom:12px">
+          <button class="btn" id="btn-copy">Copy</button>
+          <span class="pill" id="out-kind">—</span>
+          <span class="pill hidden" id="warn-brotli"><strong style="color:#ffd3d3">No native Brotli</strong> — using wasm fallback.</span>
+        </div>
+        <div class="textarea-wrap">
+          <textarea id="output" placeholder="Results appear here" readonly></textarea>
+          <div class="metrics" id="output-metrics">
+            <div class="badge" title="Raw bytes of content (before base64 when compressed)"><span class="dot"></span><span id="output-bytes">0</span> bytes</div>
+            <div class="badge" title="Characters"><span class="dot alt"></span><span id="output-chars">0</span> chars</div>
+          </div>
+        </div>
+        <div class="footer">
+          <div class="note">Compression uses <code class="inline">CompressionStream('brotli')</code> / <code class="inline">DecompressionStream('brotli')</code> if available; falls back to wasm.</div>
+          <div class="support" id="support-chip">
+            <span>Support:</span>
+            <span class="chip" id="chip-compress">compress: ?</span>
+            <span class="chip" id="chip-decompress">decompress: ?</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Quick Tests</h2>
+      <div class="pad tests">
+        <div class="controls" style="margin-bottom:10px">
+          <button class="btn" id="btn-run-tests">Run round‑trip tests</button>
+          <button class="btn ghost" id="btn-fill-sample">Fill sample input</button>
+        </div>
+        <div id="test-results" aria-live="polite"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // ---------- State & element refs ----------
+    let brotliLib = null; // from httptoolkit/brotli-wasm
+
+    const $ = (sel) => document.querySelector(sel);
+    const inputEl = $('#input');
+    const outputEl = $('#output');
+
+    const inputBytes = $('#input-bytes');
+    const inputChars = $('#input-chars');
+    const outputBytes = $('#output-bytes');
+    const outputChars = $('#output-chars');
+
+    const outKind = $('#out-kind');
+    const warnBrotli = $('#warn-brotli');
+
+    const chipCompress = $('#chip-compress');
+    const chipDecompress = $('#chip-decompress');
+
+    const testResults = $('#test-results');
+
+    // ---------- Utilities ----------
+    function utf8Bytes(str) { return new TextEncoder().encode(str); }
+    function bytesToUtf8(bytes) { return new TextDecoder().decode(bytes); }
+
+    function updateMetrics(target, bytesLen, charsLen) {
+      if (target === 'in') { inputBytes.textContent = bytesLen; inputChars.textContent = charsLen; }
+      else { outputBytes.textContent = bytesLen; outputChars.textContent = charsLen; }
+    }
+
+    function toBase64(uint8) {
+      let binary = '';
+      const chunk = 0x8000;
+      for (let i = 0; i < uint8.length; i += chunk) {
+        binary += String.fromCharCode.apply(null, uint8.subarray(i, i + chunk));
+      }
+      return btoa(binary);
+    }
+    function fromBase64(b64) {
+      const binary = atob((b64 || '').trim());
+      const len = binary.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+      return bytes;
+    }
+
+    // Pipe a Uint8Array through a Web Streams transform
+    async function transformBytes(bytes, transformStream) {
+      const { readable, writable } = new TransformStream();
+      const writer = writable.getWriter();
+      await writer.write(bytes);
+      await writer.close();
+      const outStream = readable.pipeThrough(transformStream);
+      const reader = outStream.getReader();
+      const chunks = [];
+      let total = 0;
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        total += value.byteLength || value.length;
+      }
+      const out = new Uint8Array(total);
+      let offset = 0;
+      for (const c of chunks) { out.set(c, offset); offset += c.length; }
+      return out;
+    }
+
+    function supported() {
+      const hasComp = typeof CompressionStream !== 'undefined';
+      const hasDecomp = typeof DecompressionStream !== 'undefined';
+      let compOK = false, decompOK = false;
+      try { compOK = !!(hasComp && new CompressionStream('brotli')); } catch { compOK = false; }
+      try { decompOK = !!(hasDecomp && new DecompressionStream('brotli')); } catch { decompOK = false; }
+      return { compOK, decompOK };
+    }
+
+    // ---------- Core ops (native first, then wasm fallback) ----------
+    async function compress(text) {
+      const sup = supported();
+      if (sup.compOK) {
+        const bytes = utf8Bytes(text);
+        return await transformBytes(bytes, new CompressionStream('brotli'));
+      }
+      if (!brotliLib) brotliLib = await (window.__brotliPromise || Promise.resolve(null));
+      if (brotliLib && brotliLib.compress) {
+        const input = utf8Bytes(text);
+        const compressed = brotliLib.compress(input, { quality: 6 });
+        return new Uint8Array(compressed);
+      }
+      throw new Error('No Brotli encoder available (native or wasm)');
+    }
+
+    async function decompress(b64) {
+      const sup = supported();
+      if (sup.decompOK) {
+        const bytes = fromBase64(b64);
+        const out = await transformBytes(bytes, new DecompressionStream('brotli'));
+        return bytesToUtf8(out);
+      }
+      if (!brotliLib) brotliLib = await (window.__brotliPromise || Promise.resolve(null));
+      if (brotliLib && brotliLib.decompress) {
+        const bytes = fromBase64(b64);
+        const decompressed = brotliLib.decompress(bytes);
+        return bytesToUtf8(new Uint8Array(decompressed));
+      }
+      throw new Error('No Brotli decoder available (native or wasm)');
+    }
+
+    // ---------- UI Wiring ----------
+    function refreshInputMetrics() {
+      const v = inputEl.value || '';
+      updateMetrics('in', utf8Bytes(v).length, v.length);
+    }
+    function refreshOutputMetrics() {
+      const v = outputEl.value || '';
+      updateMetrics('out', utf8Bytes(v).length, v.length);
+    }
+
+    inputEl.addEventListener('input', refreshInputMetrics);
+
+    $('#btn-compress').addEventListener('click', async () => {
+      const sup = supported();
+      const hasWasm = !!(brotliLib && (brotliLib.compress || brotliLib.decompress));
+      chipCompress.textContent = `compress: ${sup.compOK ? 'native' : (hasWasm ? 'wasm' : 'no')}`;
+      warnBrotli.classList.toggle('hidden', sup.compOK || hasWasm);
+      outKind.textContent = 'Brotli → base64';
+      try {
+        const outBytes = await compress(inputEl.value || '');
+        const b64 = toBase64(outBytes);
+        outputEl.value = b64;
+        updateMetrics('out', outBytes.length, b64.length);
+        refreshOutputMetrics();
+      } catch (err) {
+        outputEl.value = `Error compressing: ${err?.message || err}`;
+        refreshOutputMetrics();
+      }
+    });
+
+    $('#btn-decompress').addEventListener('click', async () => {
+      const sup = supported();
+      const hasWasm = !!(brotliLib && (brotliLib.compress || brotliLib.decompress));
+      chipDecompress.textContent = `decompress: ${sup.decompOK ? 'native' : (hasWasm ? 'wasm' : 'no')}`;
+      warnBrotli.classList.toggle('hidden', sup.decompOK || hasWasm);
+      outKind.textContent = 'base64 (Brotli) → text';
+      try {
+        const text = await decompress(inputEl.value || '');
+        outputEl.value = text;
+        updateMetrics('out', utf8Bytes(text).length, text.length);
+        refreshOutputMetrics();
+      } catch (err) {
+        outputEl.value = `Error decompressing: ${err?.message || err}`;
+        refreshOutputMetrics();
+      }
+    });
+
+    $('#btn-copy').addEventListener('click', async (event) => {
+      try {
+        await navigator.clipboard.writeText(outputEl.value || '');
+        const btn = event.currentTarget;
+        const prev = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = prev, 1000);
+      } catch (err) {
+        alert('Copy failed: ' + (err?.message || err));
+      }
+    });
+
+    // ---------- Tests ----------
+    const SAMPLE = `Ceci est un échantillon avec accents, emojis 😀🚀, et plusieurs lignes.\nLine 2.\nLine 3.`;
+    const TESTS = [
+      { name: 'ASCII hello', text: 'hello world' },
+      { name: 'French accents', text: 'crème brûlée — façade — naïve — élève' },
+      { name: 'Emojis', text: '🙂🙃😉🥐🧀🇫🇷' },
+      { name: 'Multiline', text: 'first\nsecond\nthird' },
+      { name: 'Large (10k a\'s)', text: 'a'.repeat(10_000) },
+      { name: 'Sample paragraph', text: SAMPLE },
+    ];
+
+    async function runTests() {
+      const results = [];
+      for (const t of TESTS) {
+        try {
+          const outBytes = await compress(t.text);
+          const b64 = toBase64(outBytes);
+          const roundtrip = await decompress(b64);
+          const ok = roundtrip === t.text;
+          results.push({ name: t.name, ok, extra: `in=${utf8Bytes(t.text).length}B, br=${outBytes.length}B` });
+        } catch (e) {
+          results.push({ name: t.name, ok: false, extra: String(e?.message || e) });
+        }
+      }
+      renderTestResults(results);
+    }
+
+    function renderTestResults(rows) {
+      const lines = rows.map(r => {
+        const mark = r.ok ? '✔' : '✘';
+        const cls = r.ok ? 'test-pass' : 'test-fail';
+        return `<div class="${cls}">${mark} ${r.name} <span class="note">(${r.extra})</span></div>`;
+      });
+      testResults.innerHTML = lines.join('');
+    }
+
+    $('#btn-run-tests').addEventListener('click', runTests);
+    $('#btn-fill-sample').addEventListener('click', () => { inputEl.value = SAMPLE; refreshInputMetrics(); });
+
+    // ---------- Initial metrics & support badges ----------
+    (async () => {
+      refreshInputMetrics();
+      refreshOutputMetrics();
+      const sup = supported();
+      try {
+        if (!sup.compOK || !sup.decompOK) {
+          brotliLib = await (window.__brotliPromise || Promise.resolve(null));
+        }
+      } catch {}
+      const hasWasm = !!(brotliLib && brotliLib.compress && brotliLib.decompress);
+      chipCompress.textContent = `compress: ${sup.compOK ? 'native' : (hasWasm ? 'wasm' : 'no')}`;
+      chipDecompress.textContent = `decompress: ${sup.decompOK ? 'native' : (hasWasm ? 'wasm' : 'no')}`;
+      warnBrotli.classList.toggle('hidden', (sup.compOK && sup.decompOK) || hasWasm);
+    })();
+  </script>
+</body>
+</html>
